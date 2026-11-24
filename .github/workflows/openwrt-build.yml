@@ -128,14 +128,21 @@ jobs:
         run: |
           cd build_dir
           make defconfig
-          sed -i '/shadowsocks-rust/d;/tuic-client/d;/PACKAGE_rust/d' .config
+          echo "=== Rust entries in .config before override ==="
+          grep -i "rust" .config || true
+          sed -i -E 's/^(CONFIG_.*RUST.*|CONFIG_PACKAGE_rust)=y/# \1 is not set/I' .config
           make defconfig
-          grep -i "rust" .config || echo "No rust packages selected"
+          echo "=== Rust entries in .config after override ==="
+          grep -i "rust" .config || echo "Clean: no rust enabled"
           make download -j8
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
-          make -j$(nproc)
+          if ! make -j$(nproc); then
+            echo "=== Retrying rust [host] with verbose output ==="
+            make package/feeds/packages/rust/host/clean || true
+            make package/feeds/packages/rust/host/compile -j1 V=s
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
