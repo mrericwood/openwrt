@@ -1,0 +1,73 @@
+name: Build OpenWrt Firmware
+
+on:
+  push:
+    branches: [ "gh-actions-workflow", "main" ]
+  schedule:
+    - cron: '0 3 * * 1'
+
+env:
+  OPENWRT_VERSION: "25"
+  ARCHITECTURE: "x86_64"
+  IMAGE_TYPE: "vmdk"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gettext git hostap-utils iptables-macfilter-legacy \
+          libxtables12 autoconf bison build-essential bzip2 \
+          ccache checkpolicy dmsetup dosfstools dpkg-dev e2fsprogs \
+          flex gawk gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+          gcc-arm-linux-gnueabihf genisoimage libncurses5-dev \
+          libncursesw5-dev python3-venv qemu-user-static \
+          squashfs-tools texinfo wget xz-utils zlib1g-dev
+      
+    - name: Clone OpenWrt Source
+      run: |
+        rm -rf build_dir
+        git clone https://git.openwrt.org/openwrt/openwrt-25/main.git build_dir
+        cd build_dir
+        git checkout master
+      
+    - name: Configure
+      run: |
+        cat > config <<EOF
+# Target System
+CONFIG_TARGET_x86_64=y
+FEATURES="filesystems overlayfs luci usbutils nbd-Client mtd-utils xfsprogs pve firmware"
+
+# Image Configuration  
+CONFIG_TARGET_IMAGES_GZIP=y
+CONFIG_TARGET_ROOTFS_DATASTORE=y
+CONFIG_TARGET_IMAGES_VMDK=y
+
+# LUCI configuration
+CONFIG_PACKAGE_luci-base=y
+CONFIG_PACKAGE_luci-i8n-base=y
+CONFIG_PACKAGE_lua=curl,yaml,crypto,zlib,openssl,brotli,jsonc,lzo,libressl,argon2,md5,sha1,sha256,tinytomcat,fsm,nl,xtables,base32,netjson
+EOF
+      
+    - name: Build Firmware
+      run: |
+        cd build_dir
+        make defconfig
+        make -j16 VMDK=1
+      
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: openwrt-x86-vmdk
+        path: |
+          build_dir/target*/root.*.tar.gz
+          bin/x86/*
+        if-no-files-found: ignore
+
