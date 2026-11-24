@@ -7,7 +7,7 @@ on:
     - cron: '0 3 * * 1'
 
 env:
-  OPENWRT_VERSION: "25"
+  OPENWRT_VERSION: "25.12"
   ARCHITECTURE: "x86_64"
   IMAGE_TYPE: "vmdk"
 
@@ -19,7 +19,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       
-    - name: Install Dependencies (Complete)
+    - name: Install Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -34,10 +34,19 @@ jobs:
           python3-setuptools qemu-utils rsync scons squashfs-tools subversion \
           swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
       
-    - name: Clone OpenWrt Source (Shallow Clone)
+    - name: Clone OpenWrt Source
       run: |
         rm -rf build_dir
-        git clone --depth 1 https://git.openwrt.org/openwrt/openwrt-25/main.git build_dir
+        git clone --depth 1 -b v25.12.0 https://git.openwrt.org/openwrt/openwrt.git build_dir
+      
+    - name: Clone Third-Party Plugins
+      run: |
+        cd build_dir/package
+        rm -rf luci-theme-argon openwrt-passwall openwrt-passwall-packages OpenClash
+        git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argon
+        git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git openwrt-passwall-packages
+        git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall.git openwrt-passwall
+        git clone --depth 1 https://github.com/vernesong/OpenClash.git OpenClash
       
     - name: Update and Install Feeds
       run: |
@@ -45,7 +54,7 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
       
-    - name: Configure (x86 VMDK)
+    - name: Configure
       shell: bash
       run: |
         cat > build_dir/.config <<'EOFCONFIG'
@@ -58,12 +67,41 @@ CONFIG_TARGET_x86_64_generic=y
 CONFIG_TARGET_IMAGES_GZIP=y
 CONFIG_TARGET_IMAGES_VMDK=y
 
-# LuCI & Lua (with Chinese translation)
+# Basic packages
 CONFIG_PACKAGE_luci=y
 CONFIG_PACKAGE_luci-base=y
 CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
 CONFIG_PACKAGE_lua=y
+
+# Third-Party Plugins (Argon Theme, Passwall, OpenClash, etc.)
+CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_luci-app-passwall=y
+CONFIG_PACKAGE_luci-app-openclash=y
+CONFIG_PACKAGE_luci-app-ttyd=y
+CONFIG_PACKAGE_tailscale=y
+CONFIG_PACKAGE_luci-app-sqm=y
 EOFCONFIG
+      
+    - name: Customize Network (DHCP)
+      shell: bash
+      run: |
+        mkdir -p build_dir/files/etc/config
+        cat > build_dir/files/etc/config/network <<'EOFNETWORK'
+config interface 'loopback'
+ option device 'lo'
+ option proto 'static'
+ option ipaddr '127.0.0.1'
+ option netmask '255.0.0.0'
+
+config device
+ option name 'br-lan'
+ option type 'bridge'
+ list ports 'eth0'
+
+config interface 'lan'
+ option device 'br-lan'
+ option proto 'dhcp'
+EOFNETWORK
       
     - name: Build Firmware
       shell: bash
@@ -82,3 +120,4 @@ EOFCONFIG
           build_dir/bin/targets/x86/64/*.img.gz
           build_dir/bin/targets/x86/64/*.tar.gz
         if-no-files-found: warn
+
