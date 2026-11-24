@@ -19,6 +19,23 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Free Up Disk Space
+        run: |
+          echo "=== Disk usage before cleanup ==="
+          df -h
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /opt/pipx \
+            /usr/local/share/boost \
+            /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/PyPy \
+            /opt/hostedtoolcache/Ruby || true
+          sudo apt-get clean || true
+          echo "=== Disk usage after cleanup ==="
+          df -h
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -68,6 +85,19 @@ jobs:
           CONFIG_PACKAGE_lua=y
           CONFIG_PACKAGE_luci-theme-argon=y
           CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox=y
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_tuic_client is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Hysteria2_Client is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy is not set
+          # CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus is not set
+          # CONFIG_PACKAGE_shadowsocks-rust-sslocal is not set
+          # CONFIG_PACKAGE_shadowsocks-rust-ssserver is not set
+          # CONFIG_PACKAGE_rust is not set
           CONFIG_PACKAGE_luci-app-openclash=y
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_tailscale=y
@@ -98,7 +128,13 @@ jobs:
         run: |
           cd build_dir
           make defconfig
+          sed -i '/shadowsocks-rust/d;/tuic-client/d;/PACKAGE_rust/d' .config
+          make defconfig
+          grep -i "rust" .config || echo "No rust packages selected"
           make download -j8
+          find dl -size -1024c -delete || true
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
           make -j$(nproc)
 
       - name: Upload Artifacts
