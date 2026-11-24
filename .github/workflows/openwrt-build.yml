@@ -128,12 +128,10 @@ jobs:
         run: |
           cd build_dir
           make defconfig
-          echo "=== Rust entries in .config before override ==="
-          grep -i "rust" .config || true
-          sed -i -E 's/^(CONFIG_.*RUST.*|CONFIG_PACKAGE_rust)=y/# \1 is not set/I' .config
-          make defconfig
-          echo "=== Rust entries in .config after override ==="
-          grep -i "rust" .config || echo "Clean: no rust enabled"
+          if [ -f feeds/packages/lang/rust/Makefile ]; then
+            sed -i 's/download-ci-llvm = true/download-ci-llvm = "if-unchanged"/g' feeds/packages/lang/rust/Makefile
+            grep -n "download-ci-llvm" feeds/packages/lang/rust/Makefile || true
+          fi
           make download -j8
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
