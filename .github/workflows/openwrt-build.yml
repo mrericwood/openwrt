@@ -128,11 +128,8 @@ jobs:
         run: |
           cd build_dir
           make defconfig
-          echo "=== Searching download-ci-llvm in rust feed ==="
-          grep -rn "download-ci-llvm" feeds/packages/lang/rust/ || true
           if [ -d feeds/packages/lang/rust ]; then
-            find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)true/\1"if-unchanged"/g' {} +
-            echo "=== After replace ==="
+            find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)true/\1false/g' {} +
             grep -rn "download-ci-llvm" feeds/packages/lang/rust/ || true
           fi
           rm -rf build_dir/target-x86_64_musl/host/rustc-* || true
