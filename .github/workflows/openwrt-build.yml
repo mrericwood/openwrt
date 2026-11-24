@@ -39,6 +39,15 @@ jobs:
           rm -rf build_dir
           git clone --depth 1 -b v25.12.0 https://git.openwrt.org/openwrt/openwrt.git build_dir
 
+      - name: Clone Third-Party Plugins
+        run: |
+          cd build_dir/package
+          rm -rf luci-theme-argon openwrt-passwall openwrt-passwall-packages OpenClash
+          git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argon
+          git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git openwrt-passwall-packages
+          git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall.git openwrt-passwall
+          git clone --depth 1 https://github.com/vernesong/OpenClash.git OpenClash
+
       - name: Update and Install Feeds
         run: |
           cd build_dir
@@ -57,6 +66,32 @@ jobs:
           CONFIG_PACKAGE_luci-base=y
           CONFIG_PACKAGE_luci-i8n-base-zh-cn=y
           CONFIG_PACKAGE_lua=y
+          CONFIG_PACKAGE_luci-theme-argon=y
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-openclash=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_tailscale=y
+          CONFIG_PACKAGE_luci-app-sqm=y
+          EOF
+
+      - name: Customize Network (DHCP)
+        run: |
+          mkdir -p build_dir/files/etc/config
+          cat > build_dir/files/etc/config/network <<'EOF'
+          config interface 'loopback'
+          	option device 'lo'
+          	option proto 'static'
+          	option ipaddr '127.0.0.1'
+          	option netmask '255.0.0.0'
+
+          config device
+          	option name 'br-lan'
+          	option type 'bridge'
+          	list ports 'eth0'
+
+          config interface 'lan'
+          	option device 'br-lan'
+          	option proto 'dhcp'
           EOF
 
       - name: Build Firmware
