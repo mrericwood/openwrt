@@ -48,21 +48,16 @@ jobs:
       - name: Configure
         run: |
           cat > build_dir/.config <<'EOF'
-# Target System
-CONFIG_TARGET_x86=y
-CONFIG_TARGET_x86_64=y
-CONFIG_TARGET_x86_64_generic=y
-
-# Image Configuration
-CONFIG_TARGET_IMAGES_GZIP=y
-CONFIG_TARGET_IMAGES_VMDK=y
-
-# LuCI & Lua
-CONFIG_PACKAGE_luci=y
-CONFIG_PACKAGE_luci-base=y
-CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
-CONFIG_PACKAGE_lua=y
-EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_generic=y
+          CONFIG_TARGET_IMAGES_GZIP=y
+          CONFIG_TARGET_IMAGES_VMDK=y
+          CONFIG_PACKAGE_luci=y
+          CONFIG_PACKAGE_luci-base=y
+          CONFIG_PACKAGE_luci-i8n-base-zh-cn=y
+          CONFIG_PACKAGE_lua=y
+          EOF
 
       - name: Build Firmware
         run: |
