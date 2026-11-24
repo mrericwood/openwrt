@@ -39,24 +39,23 @@ jobs:
         git checkout master
       
     - name: Configure
+      shell: bash
       run: |
-        cat > config <<EOF
+        cat > config <<'EOFCONFIG'
 # Target System
 CONFIG_TARGET_x86_64=y
+
+# Subsystem Packages  
 FEATURES="filesystems overlayfs luci usbutils nbd-Client mtd-utils xfsprogs pve firmware"
 
 # Image Configuration  
 CONFIG_TARGET_IMAGES_GZIP=y
 CONFIG_TARGET_ROOTFS_DATASTORE=y
 CONFIG_TARGET_IMAGES_VMDK=y
-
-# LUCI configuration
-CONFIG_PACKAGE_luci-base=y
-CONFIG_PACKAGE_luci-i8n-base=y
-CONFIG_PACKAGE_lua=curl,yaml,crypto,zlib,openssl,brotli,jsonc,lzo,libressl,argon2,md5,sha1,sha256,tinytomcat,fsm,nl,xtables,base32,netjson
-EOF
+EOFCONFIG
       
     - name: Build Firmware
+      shell: bash
       run: |
         cd build_dir
         make defconfig
