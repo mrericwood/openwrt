@@ -133,17 +133,18 @@ jobs:
           if [ -d feeds/packages/lang/rust ]; then
             find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)true/\1false/g' {} +
           fi
-          make download -j8
+          GOPROXY="${GOPROXY}" make download -j8
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
-          if ! make -j$(nproc); then
-            echo "=== Building xray-core with verbose output ==="
-            make package/openwrt-passwall-packages/xray-core/compile -j1 V=s || true
+          if ! GOPROXY="${GOPROXY}" make -j$(nproc); then
+            echo "=== Retrying xray-core with verbose output ==="
+            make package/openwrt-passwall-packages/xray-core/clean || true
+            GOPROXY="${GOPROXY}" make package/openwrt-passwall-packages/xray-core/compile -j1 V=s || true
             echo "=== Retrying rust [host] with verbose output ==="
             make package/feeds/packages/rust/host/clean || true
             make package/feeds/packages/rust/host/compile -j1 V=s || true
-            make -j$(nproc)
+            GOPROXY="${GOPROXY}" make -j$(nproc) || true
           fi
           echo "=== Generated files under bin ==="
           find bin -maxdepth 5 -type f || true
