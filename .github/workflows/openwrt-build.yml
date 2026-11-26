@@ -120,6 +120,15 @@ jobs:
           cd build_dir
           make defconfig
           grep -E "VMDK|cloudflared|tailscale" .config || true
+
+          if [ -d package/luci-app-cloudflared ]; then
+            find package/luci-app-cloudflared -path "*/etc/config/cloudflared" -delete || true
+            find package/luci-app-cloudflared -path "*/etc/init.d/cloudflared" -delete || true
+            find package/luci-app-cloudflared -name "Makefile" -exec sed -i \
+              -e '/etc\/config\/cloudflared/d' \
+              -e '/etc\/init\.d\/cloudflared/d' {} +
+          fi
+
           if [ -d feeds/packages/lang/rust ]; then
             find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)(true|false|"if-unchanged")/\1false/g' {} +
           fi
@@ -128,7 +137,12 @@ jobs:
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
-          make -j$(nproc) || make -j1 V=s
+          if ! make -j$(nproc); then
+            echo "=== Diagnosing package/install with -j1 V=s ==="
+            rm -rf build_dir/target-x86_64_musl/root-x86 staging_dir/target-x86_64_musl/stamp/.package_install
+            make package/install -j1 V=s
+            make -j1 V=s
+          fi
 
           TARGET_DIR="bin/targets/x86/64"
           OUT_DIR="${GITHUB_WORKSPACE}/release_out"
