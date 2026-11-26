@@ -77,7 +77,6 @@ jobs:
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_generic=y
           CONFIG_TARGET_IMAGES_GZIP=y
-          CONFIG_TARGET_IMAGES_VMDK=y
           CONFIG_VMDK_IMAGES=y
           CONFIG_PACKAGE_luci=y
           CONFIG_PACKAGE_luci-base=y
@@ -115,6 +114,10 @@ jobs:
           cd build_dir
           make defconfig
           grep -i "vmdk" .config || true
+          if [ -d feeds/packages/lang/rust ]; then
+            find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)(true|false|"if-unchanged")/\1"if-unchanged"/g' {} +
+          fi
+          make package/feeds/packages/rust/host/clean || true
           GOPROXY="${GOPROXY}" make download -j8
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
