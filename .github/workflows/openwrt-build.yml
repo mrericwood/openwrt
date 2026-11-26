@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: '0 3 * * 1'
 
+permissions:
+  contents: write
+
 env:
   OPENWRT_VERSION: "25.12"
   ARCHITECTURE: "x86_64"
@@ -60,9 +63,10 @@ jobs:
       - name: Clone Third-Party Plugins
         run: |
           cd build_dir/package
-          rm -rf luci-theme-argon OpenClash
+          rm -rf luci-theme-argon OpenClash luci-app-cloudflared
           git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git luci-theme-argon
           git clone --depth 1 https://github.com/vernesong/OpenClash.git OpenClash
+          git clone --depth 1 https://github.com/Lancenas/luci-app-cloudflared.git luci-app-cloudflared || true
 
       - name: Update and Install Feeds
         run: |
@@ -86,6 +90,8 @@ jobs:
           CONFIG_PACKAGE_luci-app-openclash=y
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_tailscale=y
+          CONFIG_PACKAGE_cloudflared=y
+          CONFIG_PACKAGE_luci-app-cloudflared=y
           CONFIG_PACKAGE_luci-app-sqm=y
           EOF
 
@@ -109,11 +115,11 @@ jobs:
           	option proto 'dhcp'
           EOF
 
-      - name: Build Firmware
+      - name: Build Firmware and Package Target VMDK
         run: |
           cd build_dir
           make defconfig
-          grep -i "vmdk" .config || true
+          grep -E "VMDK|cloudflared|tailscale" .config || true
           if [ -d feeds/packages/lang/rust ]; then
             find feeds/packages/lang/rust -type f -exec sed -i -E 's/(download-ci-llvm[[:space:]]*=[[:space:]]*)(true|false|"if-unchanged")/\1false/g' {} +
           fi
@@ -122,15 +128,43 @@ jobs:
           find dl -size -1024c -delete || true
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
-          make -j$(nproc) V=s || make -j1 V=s
-          echo "=== Target images under bin/targets/x86/64 ==="
-          ls -lh bin/targets/x86/64/ || true
-          echo "=== All generated files under bin ==="
-          find bin -maxdepth 5 -type f || true
+          make -j$(nproc) || make -j1 V=s
 
-      - name: Upload Artifacts
+          TARGET_DIR="bin/targets/x86/64"
+          OUT_DIR="${GITHUB_WORKSPACE}/release_out"
+          mkdir -p "${OUT_DIR}"
+
+          VMDK_FILE=""
+          if [ -f "${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk" ]; then
+            VMDK_FILE="${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
+          else
+            VMDK_FILE=$(find "${TARGET_DIR}" -maxdepth 1 -type f -name "*ext4*combined*.vmdk" | head -n 1 || true)
+          fi
+
+          if [ -z "${VMDK_FILE}" ] || [ ! -f "${VMDK_FILE}" ]; then
+            echo "ERROR: Target ext4 combined vmdk not found under ${TARGET_DIR}"
+            ls -lh "${TARGET_DIR}" || true
+            exit 1
+          fi
+
+          cp -f "${VMDK_FILE}" "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
+          tar -czvf "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz" \
+            -C "${OUT_DIR}" "openwrt-x86-64-generic-ext4-combined.vmdk"
+          rm -f "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
+          ls -lh "${OUT_DIR}/"
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v5
         with:
-          name: openwrt-x86-vmdk
-          path: build_dir/bin/targets/x86/64/**
+          name: openwrt-x86-64-generic-ext4-combined-vmdk
+          path: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz
           if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v25.12-x86_64-${{ github.run_number }}
+          name: OpenWrt 25.12 x86_64 ext4 VMDK (${{ github.run_number }})
+          files: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz
+          draft: false
+          prerelease: false
