@@ -80,6 +80,7 @@ jobs:
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_generic=y
+          CONFIG_TARGET_ROOTFS_PARTSIZE=256
           CONFIG_TARGET_IMAGES_GZIP=y
           CONFIG_VMDK_IMAGES=y
           CONFIG_PACKAGE_luci=y
@@ -119,7 +120,7 @@ jobs:
         run: |
           cd build_dir
           make defconfig
-          grep -E "VMDK|cloudflared|tailscale" .config || true
+          grep -E "VMDK|ROOTFS_PARTSIZE|cloudflared|tailscale" .config || true
 
           if [ -d package/luci-app-cloudflared ]; then
             find package/luci-app-cloudflared -path "*/etc/config/cloudflared" -delete || true
@@ -138,9 +139,7 @@ jobs:
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
           if ! make -j$(nproc); then
-            echo "=== Diagnosing package/install with -j1 V=s ==="
-            rm -rf build_dir/target-x86_64_musl/root-x86 staging_dir/target-x86_64_musl/stamp/.package_install
-            make package/install -j1 V=s
+            echo "=== Diagnosing build error with -j1 V=s ==="
             make -j1 V=s
           fi
 
