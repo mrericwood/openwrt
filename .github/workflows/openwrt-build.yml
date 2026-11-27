@@ -80,7 +80,7 @@ jobs:
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_generic=y
-          CONFIG_TARGET_ROOTFS_PARTSIZE=256
+          CONFIG_TARGET_ROOTFS_PARTSIZE=512
           CONFIG_TARGET_IMAGES_GZIP=y
           CONFIG_VMDK_IMAGES=y
           CONFIG_PACKAGE_luci=y
@@ -116,7 +116,7 @@ jobs:
           	option proto 'dhcp'
           EOF
 
-      - name: Build Firmware and Package Target VMDK
+      - name: Build Firmware and Collect Target VMDK GZ
         run: |
           cd build_dir
           make defconfig
@@ -145,32 +145,32 @@ jobs:
 
           TARGET_DIR="bin/targets/x86/64"
           OUT_DIR="${GITHUB_WORKSPACE}/release_out"
+          rm -rf "${OUT_DIR}"
           mkdir -p "${OUT_DIR}"
 
-          VMDK_FILE=""
-          if [ -f "${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk" ]; then
-            VMDK_FILE="${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
+          GZ_FILE=""
+          if [ -f "${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk.gz" ]; then
+            GZ_FILE="${TARGET_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk.gz"
           else
-            VMDK_FILE=$(find "${TARGET_DIR}" -maxdepth 1 -type f -name "*ext4*combined*.vmdk" | head -n 1 || true)
+            GZ_FILE=$(find "${TARGET_DIR}" -maxdepth 1 -type f \
+              -name "*ext4-combined*.vmdk.gz" ! -name "*efi*" | head -n 1 || true)
           fi
 
-          if [ -z "${VMDK_FILE}" ] || [ ! -f "${VMDK_FILE}" ]; then
-            echo "ERROR: Target ext4 combined vmdk not found under ${TARGET_DIR}"
+          if [ -z "${GZ_FILE}" ] || [ ! -f "${GZ_FILE}" ]; then
+            echo "ERROR: Target ext4-combined vmdk.gz not found under ${TARGET_DIR}"
             ls -lh "${TARGET_DIR}" || true
             exit 1
           fi
 
-          cp -f "${VMDK_FILE}" "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
-          tar -czvf "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz" \
-            -C "${OUT_DIR}" "openwrt-x86-64-generic-ext4-combined.vmdk"
-          rm -f "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk"
+          cp -f "${GZ_FILE}" "${OUT_DIR}/openwrt-x86-64-generic-ext4-combined.vmdk.gz"
+          echo "=== Final release file ==="
           ls -lh "${OUT_DIR}/"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v5
         with:
-          name: openwrt-x86-64-generic-ext4-combined-vmdk
-          path: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz
+          name: openwrt-x86-64-generic-ext4-combined-vmdk-gz
+          path: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.gz
           if-no-files-found: error
 
       - name: Publish to GitHub Releases
@@ -178,6 +178,6 @@ jobs:
         with:
           tag_name: v25.12-x86_64-${{ github.run_number }}
           name: OpenWrt 25.12 x86_64 ext4 VMDK (${{ github.run_number }})
-          files: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.tar.gz
+          files: release_out/openwrt-x86-64-generic-ext4-combined.vmdk.gz
           draft: false
           prerelease: false
